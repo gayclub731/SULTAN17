@@ -159,14 +159,17 @@ jobs:
 
           TAG="17.0.0-cp3a"
           TITLE="Sultan 17.0.0-cp3a Release"
-          NOTES="### Automated Build of Sultan 17.0.0-cp3a
-          
-Supported devices:
-- **gs201**: Pixel 7, 7 Pro, 7a
-- **zuma**: Pixel 8, 8 Pro, 8a
-- **zumapro**: Pixel 9, 9 Pro, 9 Pro XL, 9 Pro Fold
+          NOTES=$(cat <<'EOF'
+          ### Automated Build of Sultan 17.0.0-cp3a
 
-Built with KernelSU, KernelSU-Next, SusFS, NoMount, and VPNHide."
+          Supported devices:
+          - **gs201**: Pixel 7, 7 Pro, 7a
+          - **zuma**: Pixel 8, 8 Pro, 8a
+          - **zumapro**: Pixel 9, 9 Pro, 9 Pro XL, 9 Pro Fold
+
+          Built with KernelSU, KernelSU-Next, SusFS, NoMount, and VPNHide.
+          EOF
+          )
 
           # Upload release assets using gh
           if gh release view "$TAG" >/dev/null 2>&1; then
