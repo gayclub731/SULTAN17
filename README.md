@@ -45,10 +45,16 @@ SULTAN17-17.0.0-cp3a/
 
 ## Быстрый запуск (TUI)
 
-Запустите интерактивное меню в терминале:
+Запуск скрипта [menu.sh](https://github.com/gayclub731/SULTAN17-17.0.0-cp3a/blob/17.0.0-cp3a/menu.sh) в терминале:
 
 ```bash
 ./menu.sh
+```
+
+Либо клонирование и запуск в одну строчку:
+
+```bash
+git clone https://github.com/gayclub731/SULTAN17-17.0.0-cp3a.git && cd SULTAN17-17.0.0-cp3a && ./menu.sh
 ```
 ---
 
