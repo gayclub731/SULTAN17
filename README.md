@@ -45,8 +45,6 @@ SULTAN17-17.0.0-cp3a/
 
 ## Быстрый запуск (TUI)
 
-Запуск скрипта [menu.sh](https://github.com/gayclub731/SULTAN17-17.0.0-cp3a/blob/17.0.0-cp3a/menu.sh) в терминале:
-
 ```bash
 ./menu.sh
 ```
@@ -58,7 +56,7 @@ git clone https://github.com/gayclub731/SULTAN17-17.0.0-cp3a.git && cd SULTAN17-
 ```
 ---
 
-## ⚙️ Флаги (CLI)
+## Флаги (CLI)
 
 ### 1. Сборка ядра (`scripts/build_kernel.sh`)
 ```bash
@@ -91,20 +89,6 @@ git clone https://github.com/gayclub731/SULTAN17-17.0.0-cp3a.git && cd SULTAN17-
 #  * boot, init_boot (ядро, рамдиск KSU/Magisk), vendor_boot, vendor_kernel_boot,
 #  * dtbo, vbmeta, vbmeta_system, vbmeta_vendor.
 ```
----
-
-## зависимости
-
-Компилятор **GCC 14.2.0** уже включен в комплект (`sultan/toolchains/`). Для хост-системы:
-
-* **Ubuntu / Debian**:
-  ```bash
-  sudo apt update && sudo apt install -y bc bison build-essential curl flex git gh jq libelf-dev libssl-dev lz4 pahole python3 rsync unzip zip
-  ```
-* **Arch Linux**:
-  ```bash
-  sudo pacman -S --needed base-devel bc bison flex lz4 curl jq zip unzip python git github-cli
-  ```
 
 ---
 
