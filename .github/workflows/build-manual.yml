@@ -7,23 +7,26 @@ on:
         description: "Target Pixel Device"
         type: choice
         required: true
-        default: "gs201"
+        default: "all"
         options:
+          - all
           - gs201
           - zuma
           - zumapro
-          - all
       variant:
         description: "Kernel Variant (NoMount is included in all)"
         type: choice
         required: true
-        default: "ksu-next-susfs"
+        default: "all"
         options:
+          - all
           - ksu-susfs
           - ksu-susfs-vpnhide
           - ksu-next-susfs
           - ksu-next-susfs-vpnhide
-          - all
+
+permissions:
+  contents: write
 
 jobs:
   prepare-matrix:
@@ -125,4 +128,52 @@ jobs:
             release/*.zip
             release/nightly.json
           if-no-files-found: error
-# updated: сб 24 окт 2026 16:43:42 +07
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: success() || failure()
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: downloaded_artifacts
+          merge-multiple: true
+
+      - name: Create or update GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -Eeuo pipefail
+          shopt -s nullglob
+          FILES=(downloaded_artifacts/*.zip)
+
+          if (( ${#FILES[@]} == 0 )); then
+            echo "No zip files found in artifacts. Skipping release creation."
+            exit 1
+          fi
+
+          TAG="17.0.0-cp3a"
+          TITLE="Sultan 17.0.0-cp3a Release"
+          NOTES="### Automated Build of Sultan 17.0.0-cp3a
+          
+Supported devices:
+- **gs201**: Pixel 7, 7 Pro, 7a
+- **zuma**: Pixel 8, 8 Pro, 8a
+- **zumapro**: Pixel 9, 9 Pro, 9 Pro XL, 9 Pro Fold
+
+Built with KernelSU, KernelSU-Next, SusFS, NoMount, and VPNHide."
+
+          # Upload release assets using gh
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${FILES[@]}" downloaded_artifacts/nightly.json --clobber
+          else
+            gh release create "$TAG" "${FILES[@]}" downloaded_artifacts/nightly.json \
+              --title "$TITLE" \
+              --notes "$NOTES"
+          fi
+          echo "Release successfully published: $TAG"
