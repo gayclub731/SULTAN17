@@ -157,8 +157,9 @@ jobs:
             exit 1
           fi
 
-          TAG="17.0.0-cp3a"
-          TITLE="Sultan 17.0.0-cp3a Release"
+          BUILD_DATE="$(TZ='Asia/Novosibirsk' date +'%d.%m.%Y')"
+          TAG="17.0.0-cp3a_${BUILD_DATE}"
+          TITLE="Sultan 17.0.0-cp3a_${BUILD_DATE}"
           NOTES=$(cat <<'EOF'
           ### Automated Build of Sultan 17.0.0-cp3a
 

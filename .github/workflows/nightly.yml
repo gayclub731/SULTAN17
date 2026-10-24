@@ -2,8 +2,11 @@ name: Automated Nightly Build
 
 on:
   schedule:
-    - cron: "0 2 * * *"
+    - cron: "0 5,17 * * *" # Runs twice daily: 00:00 and 12:00 in UTC+7 (05:00 and 17:00 UTC)
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   check-upstream:
@@ -113,4 +116,56 @@ jobs:
             release/*.zip
             release/nightly.json
           if-no-files-found: error
-# updated: сб 24 окт 2026 16:43:59 +07
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: build-nightly
+    runs-on: ubuntu-latest
+    if: success() || failure()
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: downloaded_artifacts
+          merge-multiple: true
+
+      - name: Create or update GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -Eeuo pipefail
+          shopt -s nullglob
+          FILES=(downloaded_artifacts/*.zip)
+
+          if (( ${#FILES[@]} == 0 )); then
+            echo "No zip files found in artifacts. Skipping release creation."
+            exit 1
+          fi
+
+          BUILD_DATE="$(TZ='Asia/Novosibirsk' date +'%d.%m.%Y')"
+          TAG="17.0.0-cp3a_${BUILD_DATE}"
+          TITLE="Sultan 17.0.0-cp3a_${BUILD_DATE}"
+          NOTES=$(cat <<'EOF'
+          ### Automated Nightly Build of Sultan 17.0.0-cp3a
+
+          Supported devices:
+          - **gs201**: Pixel 7, 7 Pro, 7a
+          - **zuma**: Pixel 8, 8 Pro, 8a
+          - **zumapro**: Pixel 9, 9 Pro, 9 Pro XL, 9 Pro Fold
+
+          Built with KernelSU, KernelSU-Next, SusFS, NoMount, and VPNHide.
+          EOF
+          )
+
+          # Upload release assets using gh
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${FILES[@]}" downloaded_artifacts/nightly.json --clobber
+          else
+            gh release create "$TAG" "${FILES[@]}" downloaded_artifacts/nightly.json \
+              --title "$TITLE" \
+              --notes "$NOTES"
+          fi
+          echo "Release successfully published: $TAG"

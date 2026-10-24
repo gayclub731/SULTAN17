@@ -1,6 +1,8 @@
+[English](README_EN.md) | **Русский**
+
 # Sultan 17 Kernel Builder & Device Toolkit
 
-[![Sultan 17](https://img.shields.io/badge/Sultan%2017-17.0.0--cp3a-green.svg)](https://github.com/gayclub731/SULTAN17-17.0.0-cp3a)
+[![Sultan 17](https://img.shields.io/badge/Sultan%2017-17.0.0--cp3a-green.svg)](https://github.com/gayclub731/SULTAN17)
 [![Kernel](https://img.shields.io/badge/Kernel-6.1%20GKI-blue.svg)](https://www.kernel.org/)
 [![Devices](https://img.shields.io/badge/Pixel-gs201%20%7C%20zuma%20%7C%20zumapro-orange.svg)](https://store.google.com/)
 [![License](https://img.shields.io/badge/License-GPLv2-lightgrey.svg)](sultan/COPYING)
@@ -25,7 +27,7 @@
 ## Дерево каталогов
 
 ```text
-SULTAN17-17.0.0-cp3a/
+SULTAN17/
 ├── menu.sh               # Главное консольное TUI-меню (EN / RU)
 ├── scripts/              # Автономные скрипты с поддержкой CLI-флагов
 │   ├── build_kernel.sh   # Сборка, патчинг и упаковка AnyKernel
@@ -45,18 +47,20 @@ SULTAN17-17.0.0-cp3a/
 
 ## Быстрый запуск (TUI)
 
+Запустите интерактивное меню в терминале:
+
 ```bash
 ./menu.sh
 ```
 
 Либо клонирование и запуск в одну строчку:
-
 ```bash
-git clone https://github.com/gayclub731/SULTAN17-17.0.0-cp3a.git && cd SULTAN17-17.0.0-cp3a && ./menu.sh
+git clone -b 17.0.0-cp3a https://github.com/gayclub731/SULTAN17.git && cd SULTAN17 && ./menu.sh
 ```
+
 ---
 
-## Флаги (CLI)
+## ⚙️ Флаги (CLI)
 
 ### 1. Сборка ядра (`scripts/build_kernel.sh`)
 ```bash
@@ -89,3 +93,32 @@ git clone https://github.com/gayclub731/SULTAN17-17.0.0-cp3a.git && cd SULTAN17-
 #  * boot, init_boot (ядро, рамдиск KSU/Magisk), vendor_boot, vendor_kernel_boot,
 #  * dtbo, vbmeta, vbmeta_system, vbmeta_vendor.
 ```
+
+---
+
+## 📦 Зависимости
+
+Компилятор **GCC 14.2.0** уже включен в комплект (`sultan/toolchains/`). Для хост-системы:
+
+* **Ubuntu / Debian**:
+  ```bash
+  sudo apt update && sudo apt install -y bc bison build-essential curl flex git gh jq libelf-dev libssl-dev lz4 pahole python3 rsync unzip zip
+  ```
+* **Arch Linux**:
+  ```bash
+  sudo pacman -S --needed base-devel bc bison flex lz4 curl jq zip unzip python git github-cli
+  ```
+
+---
+
+## 🤝 Благодарности (Credits)
+
+* **[Ante0 / SULTAN17 (17.0.0-cp3a)](https://github.com/Ante0/SULTAN17/tree/17.0.0-cp3a)** — базовая ветка ядра Sultan под Pixel Tensor и скрипты сборки.
+* **[Ante0 / android_kernel_google_tensynos (17.0.0-cp3a)](https://github.com/Ante0/android_kernel_google_tensynos/tree/17.0.0-cp3a)** — дерево ядра Google Tensor/Exynos.
+* **[Sultan Alsawaf (kerneltoast)](https://github.com/kerneltoast)** — автор оригинального Sultan Kernel и оптимизаций.
+* **[KernelSU (tiann)](https://github.com/tiann/KernelSU)** & **[KernelSU-Next](https://github.com/KernelSU-Next/KernelSU-Next)** — реализация root в пространстве ядра.
+* **[SusFS (simonpunk)](https://gitlab.com/simonpunk/susfs4ksu)** — механизм скрытия рута и точек монтирования.
+* **[NoMount (maxsteeel)](https://github.com/maxsteeel/nomount)** — драйвер скрытия mount namespaces.
+* **[VPNHide (okhsunrog)](https://github.com/okhsunrog/vpnhide)** — драйвер скрытия интерфейса VPN.
+* **[AnyKernel3 (osm0sis / Ante0)](https://github.com/Ante0/AnyKernel3)** — шаблон для прошивки ядер.
+* **[Патчи Ante0](https://github.com/Ante0/kernel_patches)** & **[Фиксы Ante0](https://github.com/Ante0/fix_patches)** — набор патчей совместимости.
