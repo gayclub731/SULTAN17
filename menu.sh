@@ -42,6 +42,9 @@ toggle_language() {
 
 main_menu() {
     ensure_base_dirs
+    check_platform_tools
+    check_toolchain || true
+    auto_install_dependencies
     while true; do
         print_header
         if [[ "${CURRENT_LANG}" == "ru" ]]; then

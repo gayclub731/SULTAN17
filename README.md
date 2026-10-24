@@ -5,20 +5,16 @@
 [![Devices](https://img.shields.io/badge/Pixel-gs201%20%7C%20zuma%20%7C%20zumapro-orange.svg)](https://store.google.com/)
 [![License](https://img.shields.io/badge/License-GPLv2-lightgrey.svg)](sultan/COPYING)
 
-Универсальный TUI и CLI-инструментарий для сборки кастомных ядер **Sultan 17.0.0-cp3a** под Google Pixel (Pixel 7 / 8 / 9) с интеграцией **KernelSU**, **KernelSU-Next**, **SusFS**, **NoMount** и **VPNHide**, а также бэкапом разделов через ADB / Fastboot.
-
-Работает **локально на Linux** и в облаке **через GitHub Actions CI/CD**.
+Универсальный TUI и CLI-инструментарий для сборки кастомных ядер под Google Pixel (Pixel 7 / 8 / 9) с интеграцией патчей **Sultan**, **KSU**, **KSU-Next**, **SusFS**, **NoMount** и **VPNHide**, а также бэкапом разделов через ADB / Fastboot.
 
 ---
-
-## 📱 Девайсы и патчи
 
 ### Поддерживаемые устройства:
 * **`gs201`** — Pixel 7 / 7 Pro / 7a (Tensor G2)
 * **`zuma`** — Pixel 8 / 8 Pro / 8a (Tensor G3)
 * **`zumapro`** — Pixel 9 / 9 Pro / 9 Pro XL / 9 Pro Fold (Tensor G4)
 
-### Варианты ядер (*NoMount включен во все варианты по умолчанию*):
+### Варианты ядер:
 1. **`ksu-susfs`** — KernelSU + SusFS + **NoMount**
 2. **`ksu-susfs-vpnhide`** — KernelSU + SusFS + **NoMount** + VPNHide
 3. **`ksu-next-susfs`** — KernelSU-Next + SusFS + **NoMount**
@@ -26,7 +22,7 @@
 
 ---
 
-## 📂 Дерево каталогов
+## Дерево каталогов
 
 ```text
 SULTAN17-17.0.0-cp3a/
@@ -47,21 +43,16 @@ SULTAN17-17.0.0-cp3a/
 
 ---
 
-## 🚀 Быстрый запуск (TUI)
+## Быстрый запуск (TUI)
 
 Запустите интерактивное меню в терминале:
 
 ```bash
 ./menu.sh
 ```
-
-В меню доступны: сборка ядра, очистка `temp/`, бэкап разделов телефона, проверка апстрима и переключение языка **`[ L ]` (English / Русский)**.
-
 ---
 
-## ⚙️ Использование через флаги терминала (CLI)
-
-Все скрипты в папке `scripts/` можно запускать автономно:
+## ⚙️ Флаги (CLI)
 
 ### 1. Сборка ядра (`scripts/build_kernel.sh`)
 ```bash
@@ -94,19 +85,9 @@ SULTAN17-17.0.0-cp3a/
 #  * boot, init_boot (ядро, рамдиск KSU/Magisk), vendor_boot, vendor_kernel_boot,
 #  * dtbo, vbmeta, vbmeta_system, vbmeta_vendor.
 ```
-
 ---
 
-## ☁️ Сборка в GitHub Actions
-
-1. Перейдите во вкладку **Actions** в репозитории на GitHub.
-2. Выберите **Build Kernel (Manual)** -> нажмите **Run workflow**.
-3. Выберите устройство (`gs201`, `zuma`, `zumapro` или `all`) и набор патчей.
-4. Готовый AnyKernel zip скачивается прямо со страницы запуска (Artifacts).
-
----
-
-## 📦 Системные зависимости
+## зависимости
 
 Компилятор **GCC 14.2.0** уже включен в комплект (`sultan/toolchains/`). Для хост-системы:
 

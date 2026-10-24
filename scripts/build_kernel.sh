@@ -83,7 +83,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 ensure_base_dirs
-check_host_dependencies || true
+check_toolchain || true
+auto_install_dependencies
 
 # 1. Check existing temp directory
 if [[ -d "${TEMP_DIR}" && -n "$(ls -A "${TEMP_DIR}" 2>/dev/null)" ]]; then
