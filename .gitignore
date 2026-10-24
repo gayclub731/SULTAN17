@@ -11,15 +11,9 @@
 /adb/
 /out/
 .clean_backup/
+sultan/.clean_backup/
 
 # State and cache files
 .lang
 .upstream_shas
 
-# Build artifacts
-*.o
-*.ko
-*.mod*
-*.cmd
-modules.order
-Module.symvers

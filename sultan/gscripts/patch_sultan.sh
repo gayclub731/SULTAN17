@@ -198,6 +198,13 @@ patch_susfs_ksu() {
 		"$KERNEL_REPO/susfs4ksu/kernel_patches/50_add_susfs_in_gki-android14-6.1.patch"
 
 	msg "Applying SUSFS KernelSU patch"
+	if ! patch --dry-run -s -f -d "$KERNEL_REPO/KernelSU" -p1 < "$KERNEL_REPO/susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" 2>/dev/null; then
+		warn "KernelSU HEAD has patch rejects with SUSFS. Falling back to verified compatible commit 3352209f..."
+		(
+			cd "$KERNEL_REPO/KernelSU"
+			git checkout 3352209f44fc9c5f3ec6dff228080118433cb72c 2>/dev/null || true
+		)
+	fi
 	apply_patch_optional \
 		"$KERNEL_REPO/KernelSU" \
 		"$KERNEL_REPO/susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"

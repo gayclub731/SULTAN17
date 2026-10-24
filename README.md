@@ -89,17 +89,3 @@ git clone https://github.com/gayclub731/SULTAN17-17.0.0-cp3a.git && cd SULTAN17-
 #  * boot, init_boot (ядро, рамдиск KSU/Magisk), vendor_boot, vendor_kernel_boot,
 #  * dtbo, vbmeta, vbmeta_system, vbmeta_vendor.
 ```
-
----
-
-## 🤝 Благодарности (Credits)
-
-* **[Ante0 / SULTAN17 (17.0.0-cp3a)](https://github.com/Ante0/SULTAN17/tree/17.0.0-cp3a)** — базовая ветка ядра Sultan под Pixel Tensor и скрипты сборки.
-* **[Ante0 / android_kernel_google_tensynos (17.0.0-cp3a)](https://github.com/Ante0/android_kernel_google_tensynos/tree/17.0.0-cp3a)** — дерево ядра Google Tensor/Exynos.
-* **[Sultan Alsawaf (kerneltoast)](https://github.com/kerneltoast)** — автор оригинального Sultan Kernel и оптимизаций.
-* **[KernelSU (tiann)](https://github.com/tiann/KernelSU)** & **[KernelSU-Next](https://github.com/KernelSU-Next/KernelSU-Next)** — реализация root в пространстве ядра.
-* **[SusFS (simonpunk)](https://gitlab.com/simonpunk/susfs4ksu)** — механизм скрытия рута и точек монтирования.
-* **[NoMount (maxsteeel)](https://github.com/maxsteeel/nomount)** — драйвер скрытия mount namespaces.
-* **[VPNHide (okhsunrog)](https://github.com/okhsunrog/vpnhide)** — драйвер скрытия интерфейса VPN.
-* **[AnyKernel3 (osm0sis / Ante0)](https://github.com/Ante0/AnyKernel3)** — шаблон для прошивки ядер.
-* **[Патчи Ante0](https://github.com/Ante0/kernel_patches)** & **[Фиксы Ante0](https://github.com/Ante0/fix_patches)** — набор патчей совместимости.
