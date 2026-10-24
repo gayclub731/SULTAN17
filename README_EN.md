@@ -60,7 +60,7 @@ git clone -b 17.0.0-cp3a https://github.com/gayclub731/SULTAN17.git && cd SULTAN
 
 ---
 
-## ⚙️ CLI Flags
+## CLI Flags
 
 ### 1. Build Kernel (`scripts/build_kernel.sh`)
 ```bash
@@ -96,22 +96,7 @@ git clone -b 17.0.0-cp3a https://github.com/gayclub731/SULTAN17.git && cd SULTAN
 
 ---
 
-## 📦 Dependencies
-
-The **GCC 14.2.0** toolchain is bundled in `sultan/toolchains/`. For the host environment:
-
-* **Ubuntu / Debian**:
-  ```bash
-  sudo apt update && sudo apt install -y bc bison build-essential curl flex git gh jq libelf-dev libssl-dev lz4 pahole python3 rsync unzip zip
-  ```
-* **Arch Linux**:
-  ```bash
-  sudo pacman -S --needed base-devel bc bison flex lz4 curl jq zip unzip python git github-cli
-  ```
-
----
-
-## 🤝 Credits & Acknowledgements
+## Credits & Acknowledgements
 
 * **[Ante0 / SULTAN17 (17.0.0-cp3a)](https://github.com/Ante0/SULTAN17/tree/17.0.0-cp3a)** — Base Sultan kernel branch for Pixel Tensor and build scripts.
 * **[Ante0 / android_kernel_google_tensynos (17.0.0-cp3a)](https://github.com/Ante0/android_kernel_google_tensynos/tree/17.0.0-cp3a)** — Google Tensor/Exynos kernel tree.

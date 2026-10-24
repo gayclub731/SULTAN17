@@ -60,7 +60,7 @@ git clone -b 17.0.0-cp3a https://github.com/gayclub731/SULTAN17.git && cd SULTAN
 
 ---
 
-## ⚙️ Флаги (CLI)
+## Флаги (CLI)
 
 ### 1. Сборка ядра (`scripts/build_kernel.sh`)
 ```bash
@@ -96,22 +96,7 @@ git clone -b 17.0.0-cp3a https://github.com/gayclub731/SULTAN17.git && cd SULTAN
 
 ---
 
-## 📦 Зависимости
-
-Компилятор **GCC 14.2.0** уже включен в комплект (`sultan/toolchains/`). Для хост-системы:
-
-* **Ubuntu / Debian**:
-  ```bash
-  sudo apt update && sudo apt install -y bc bison build-essential curl flex git gh jq libelf-dev libssl-dev lz4 pahole python3 rsync unzip zip
-  ```
-* **Arch Linux**:
-  ```bash
-  sudo pacman -S --needed base-devel bc bison flex lz4 curl jq zip unzip python git github-cli
-  ```
-
----
-
-## 🤝 Благодарности (Credits)
+## Благодарности (Credits)
 
 * **[Ante0 / SULTAN17 (17.0.0-cp3a)](https://github.com/Ante0/SULTAN17/tree/17.0.0-cp3a)** — базовая ветка ядра Sultan под Pixel Tensor и скрипты сборки.
 * **[Ante0 / android_kernel_google_tensynos (17.0.0-cp3a)](https://github.com/Ante0/android_kernel_google_tensynos/tree/17.0.0-cp3a)** — дерево ядра Google Tensor/Exynos.
