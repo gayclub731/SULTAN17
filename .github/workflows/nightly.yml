@@ -1,0 +1,115 @@
+name: Automated Nightly Build
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+jobs:
+  check-upstream:
+    name: Check Upstream Changes
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.check.outputs.matrix }}
+      has_changes: ${{ steps.check.outputs.has_changes }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq curl git gh
+
+      - name: Make scripts executable
+        run: chmod +x menu.sh scripts/*.sh sultan/gscripts/*.sh
+
+      - name: Check upstream commits
+        id: check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -Eeuo pipefail
+          ./scripts/check_upstream.sh
+
+          TMP_JSON="/tmp/matrix.json"
+          TARGETS=(gs201 zuma zumapro)
+          VARIANTS=(ksu-susfs ksu-susfs-vpnhide ksu-next-susfs ksu-next-susfs-vpnhide)
+
+          JSON='{"include":['
+          FIRST=true
+          for T in "${TARGETS[@]}"; do
+            for V in "${VARIANTS[@]}"; do
+              if $FIRST; then FIRST=false; else JSON+=","; fi
+              JSON+="{\"target\":\"${T}\",\"variant\":\"${V}\"}"
+            done
+          done
+          JSON+="]}"
+
+          echo "matrix=$JSON" >> "$GITHUB_OUTPUT"
+          echo "has_changes=true" >> "$GITHUB_OUTPUT"
+
+  build-nightly:
+    name: "${{ matrix.target }} • ${{ matrix.variant }}"
+    needs: check-upstream
+    if: needs.check-upstream.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.check-upstream.outputs.matrix) }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            bc \
+            bison \
+            build-essential \
+            ccache \
+            curl \
+            flex \
+            git \
+            gh \
+            jq \
+            libelf-dev \
+            libssl-dev \
+            lz4 \
+            pahole \
+            python3 \
+            rsync \
+            unzip \
+            zip
+
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-nightly-${{ runner.os }}-${{ matrix.target }}
+          restore-keys: |
+            ccache-nightly-${{ runner.os }}-${{ matrix.target }}
+            ccache-nightly-${{ runner.os }}
+
+      - name: Ensure execution permissions
+        run: chmod +x menu.sh scripts/*.sh sultan/gscripts/*.sh
+
+      - name: Build Kernel
+        run: |
+          ./scripts/build_kernel.sh \
+            --target "${{ matrix.target }}" \
+            --variant "${{ matrix.variant }}" \
+            --clean-temp \
+            --no-check-upstream
+
+      - name: Upload Kernel Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nightly_${{ matrix.target }}_${{ matrix.variant }}
+          path: |
+            release/*.zip
+            release/nightly.json
+          if-no-files-found: error

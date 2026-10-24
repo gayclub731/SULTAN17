@@ -1,0 +1,25 @@
+# Archives and large bundles
+*.zip
+*.tar.gz
+*.tar.xz
+*.7z
+
+# Dynamic and output folders
+/temp/
+/backup/
+/release/
+/adb/
+/out/
+.clean_backup/
+
+# State and cache files
+.lang
+.upstream_shas
+
+# Build artifacts
+*.o
+*.ko
+*.mod*
+*.cmd
+modules.order
+Module.symvers

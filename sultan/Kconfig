@@ -1,0 +1,62 @@
+# SPDX-License-Identifier: GPL-2.0
+#
+# For a description of the syntax of this configuration file,
+# see Documentation/kbuild/kconfig-language.rst.
+#
+mainmenu "Linux/$(ARCH) $(KERNELVERSION) Kernel Configuration"
+
+source "scripts/Kconfig.include"
+
+source "init/Kconfig"
+
+source "kernel/Kconfig.freezer"
+
+source "fs/Kconfig.binfmt"
+
+source "mm/Kconfig"
+
+source "net/Kconfig"
+
+source "drivers/Kconfig"
+
+source "fs/Kconfig"
+
+source "security/Kconfig"
+
+source "crypto/Kconfig"
+
+source "lib/Kconfig"
+
+source "lib/Kconfig.debug"
+
+source "Documentation/Kconfig"
+
+choice
+	prompt "Google SoC Kconfig.ext to use"
+	default KCONFIG_EXT_NONE
+
+config KCONFIG_EXT_NONE
+	bool "None"
+
+config KCONFIG_EXT_GS201
+	bool "Tensor G2 (gs201)"
+
+config KCONFIG_EXT_ZUMA
+	bool "Tensor G3 (zuma)"
+
+config KCONFIG_EXT_ZUMAPRO
+	bool "Tensor G4 (zumapro)"
+
+endchoice
+
+if KCONFIG_EXT_GS201
+source "google-devices/gs201/Kconfig.ext.gs201"
+endif
+
+if KCONFIG_EXT_ZUMA
+source "google-devices/zuma/Kconfig.ext.zuma"
+endif
+
+if KCONFIG_EXT_ZUMAPRO
+source "google-devices/zumapro/Kconfig.ext.zumapro"
+endif

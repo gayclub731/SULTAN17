@@ -1,0 +1,127 @@
+name: Build Kernel (Manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Target Pixel Device"
+        type: choice
+        required: true
+        default: "gs201"
+        options:
+          - gs201
+          - zuma
+          - zumapro
+          - all
+      variant:
+        description: "Kernel Variant (NoMount is included in all)"
+        type: choice
+        required: true
+        default: "ksu-next-susfs"
+        options:
+          - ksu-susfs
+          - ksu-susfs-vpnhide
+          - ksu-next-susfs
+          - ksu-next-susfs-vpnhide
+          - all
+
+jobs:
+  prepare-matrix:
+    name: Generate Matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+    steps:
+      - name: Generate build matrix
+        id: gen
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          TARGET="${{ github.event.inputs.target }}"
+          VARIANT="${{ github.event.inputs.variant }}"
+
+          if [[ "$TARGET" == "all" ]]; then
+            TARGETS=(gs201 zuma zumapro)
+          else
+            TARGETS=("$TARGET")
+          fi
+
+          if [[ "$VARIANT" == "all" ]]; then
+            VARIANTS=(ksu-susfs ksu-susfs-vpnhide ksu-next-susfs ksu-next-susfs-vpnhide)
+          else
+            VARIANTS=("$VARIANT")
+          fi
+
+          JSON='{"include":['
+          FIRST=true
+          for T in "${TARGETS[@]}"; do
+            for V in "${VARIANTS[@]}"; do
+              if $FIRST; then FIRST=false; else JSON+=","; fi
+              JSON+="{\"target\":\"${T}\",\"variant\":\"${V}\"}"
+            done
+          done
+          JSON+="]}"
+          echo "matrix=$JSON" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: "${{ matrix.target }} • ${{ matrix.variant }}"
+    needs: prepare-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            bc \
+            bison \
+            build-essential \
+            ccache \
+            curl \
+            flex \
+            git \
+            gh \
+            jq \
+            libelf-dev \
+            libssl-dev \
+            lz4 \
+            pahole \
+            python3 \
+            rsync \
+            unzip \
+            zip
+
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-${{ runner.os }}-${{ matrix.target }}
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ matrix.target }}
+            ccache-${{ runner.os }}
+
+      - name: Ensure execution permissions
+        run: chmod +x menu.sh scripts/*.sh sultan/gscripts/*.sh
+
+      - name: Build Kernel
+        run: |
+          ./scripts/build_kernel.sh \
+            --target "${{ matrix.target }}" \
+            --variant "${{ matrix.variant }}" \
+            --clean-temp \
+            --no-check-upstream
+
+      - name: Upload Kernel Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SULTAN17_${{ matrix.target }}_${{ matrix.variant }}
+          path: |
+            release/*.zip
+            release/nightly.json
+          if-no-files-found: error
