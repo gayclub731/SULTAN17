@@ -221,6 +221,12 @@ patch_susfs_ksu_next() {
         "$KERNEL_REPO/susfs4ksu/kernel_patches/50_add_susfs_in_gki-android14-6.1.patch"
 
 	msg "Applying SUSFS KernelSU patch"
+	if grep -q "mutex_lock(&selinux_state.status_lock);" "$KERNEL_REPO/KernelSU-Next/kernel/feature/selinux_hide.c" 2>/dev/null; then
+		sed -i '/mutex_lock(&selinux_state.status_lock);/d' "$KERNEL_REPO/KernelSU-Next/kernel/feature/selinux_hide.c"
+		sed -i '/mutex_unlock(&selinux_state.status_lock);/d' "$KERNEL_REPO/KernelSU-Next/kernel/feature/selinux_hide.c"
+		sed -i 's/^[[:space:]]*data = fake_status;/        void *data = fake_status;/' "$KERNEL_REPO/KernelSU-Next/kernel/feature/selinux_hide.c"
+		sed -i '/^[[:space:]]*void \*data;$/d' "$KERNEL_REPO/KernelSU-Next/kernel/feature/selinux_hide.c"
+	fi
 	apply_patch_optional \
 		"$KERNEL_REPO/KernelSU-Next" \
 		"$KERNEL_REPO/susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
