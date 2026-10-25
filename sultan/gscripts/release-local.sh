@@ -121,8 +121,6 @@ TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 cat > "${RELEASE_DIR}/nightly.json" <<EOF
 {
   "build_date": "${TIMESTAMP}",
-  "target": "${TARGET}",
-  "variant": "${VARIANT}",
   "source": "${SOURCE_SHA}",
   "kernelsu": "${KSU_SHA}",
   "kernelsu_next": "${NEXT_SHA}",

@@ -157,6 +157,12 @@ jobs:
             exit 1
           fi
 
+          # Ensure nightly.json contains only global metadata (no target or variant)
+          if [[ -f downloaded_artifacts/nightly.json ]]; then
+            jq 'del(.target, .variant)' downloaded_artifacts/nightly.json > downloaded_artifacts/nightly_clean.json
+            mv downloaded_artifacts/nightly_clean.json downloaded_artifacts/nightly.json
+          fi
+
           BUILD_DATE="$(TZ='Asia/Novosibirsk' date +'%d.%m.%Y')"
           TAG="17.0.0-cp3a_${BUILD_DATE}"
           TITLE="Sultan 17.0.0-cp3a_${BUILD_DATE}"
