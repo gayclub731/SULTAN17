@@ -189,6 +189,101 @@ copy_susfs() {
 }
 ##
 
+patch_selinux_hide_timing() {
+	local ksu_dir="$1"
+	local target_file="${ksu_dir}/kernel/feature/selinux_hide.c"
+
+	if [[ ! -f "$target_file" ]]; then
+		return 0
+	fi
+
+	msg "Applying SELinux hide timing fix to eliminate Duck Detector side-channel detection"
+	python3 - <<EOF
+with open("${target_file}", "r", encoding="utf-8") as f:
+    content = f.read()
+
+# 1. Neutralize Duck Detector timing probe in my_setprocattr
+target_hook = "error = ksu_avc_has_perm_compat(mysid, mysid, SECCLASS_PROCESS, PROCESS__SETCURRENT, NULL);\n    if (error)\n        return error;"
+replacement_hook = """error = ksu_avc_has_perm_compat(mysid, mysid, SECCLASS_PROCESS, PROCESS__SETCURRENT, NULL);
+    if (error)
+        return error;
+
+    /* Fast-reject Duck Detector and side-channel timing probes */
+    if (unlikely(str && (strstr(str, "__selinux_hide_") || strstr(str, "duckdetector"))))
+        return -EINVAL;"""
+
+if target_hook in content and "__selinux_hide_" not in content:
+    content = content.replace(target_hook, replacement_hook, 1)
+
+# 2. Optimize context allocation in security_context_to_sid_with_policy to eliminate timing gap
+old_alloc = """    /* Copy the string to allow changes and ensure a NUL terminator */
+    scontext2 = kmemdup_nul(scontext, scontext_len, gfp_flags);
+    if (!scontext2)
+        return -ENOMEM;
+
+    scontext3 = kmemdup_nul(scontext, scontext_len, gfp_flags);
+    if (!scontext3) {
+        kfree(scontext2);
+        return -ENOMEM;
+    }"""
+
+new_alloc = """    /* Copy the string to allow changes and ensure a NUL terminator (on-stack fast path) */
+    char scontext2_onstack[128] __aligned(sizeof(long));
+    char scontext3_onstack[128] __aligned(sizeof(long));
+    bool scontext2_alloc = false, scontext3_alloc = false;
+
+    if (scontext_len < sizeof(scontext2_onstack)) {
+        scontext2 = scontext2_onstack;
+        memcpy(scontext2, scontext, scontext_len);
+        scontext2[scontext_len] = '\\0';
+    } else {
+        scontext2 = kmemdup_nul(scontext, scontext_len, gfp_flags);
+        if (!scontext2)
+            return -ENOMEM;
+        scontext2_alloc = true;
+    }
+
+    if (scontext_len < sizeof(scontext3_onstack)) {
+        scontext3 = scontext3_onstack;
+        memcpy(scontext3, scontext, scontext_len);
+        scontext3[scontext_len] = '\\0';
+    } else {
+        scontext3 = kmemdup_nul(scontext, scontext_len, gfp_flags);
+        if (!scontext3) {
+            if (scontext2_alloc)
+                kfree(scontext2);
+            return -ENOMEM;
+        }
+        scontext3_alloc = true;
+    }"""
+
+old_free = """    if (orig_rc_p)
+        *orig_rc_p = orig_rc;
+    kfree(scontext3);
+    kfree(scontext2);
+    kfree(str);
+    return rc;"""
+
+new_free = """    if (orig_rc_p)
+        *orig_rc_p = orig_rc;
+    if (scontext3_alloc)
+        kfree(scontext3);
+    if (scontext2_alloc)
+        kfree(scontext2);
+    kfree(str);
+    return rc;"""
+
+if old_alloc in content:
+    content = content.replace(old_alloc, new_alloc, 1)
+
+if old_free in content:
+    content = content.replace(old_free, new_free, 1)
+
+with open("${target_file}", "w", encoding="utf-8") as f:
+    f.write(content)
+EOF
+}
+
 patch_susfs_ksu() {
 	msg "Copying susfs libs"
 	copy_susfs
@@ -208,6 +303,8 @@ patch_susfs_ksu() {
 	apply_patch_optional \
 		"$KERNEL_REPO/KernelSU" \
 		"$KERNEL_REPO/susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
+
+	patch_selinux_hide_timing "$KERNEL_REPO/KernelSU"
 }
 
 patch_susfs_ksu_next() {
@@ -230,6 +327,8 @@ patch_susfs_ksu_next() {
 	apply_patch_optional \
 		"$KERNEL_REPO/KernelSU-Next" \
 		"$KERNEL_REPO/susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
+
+	patch_selinux_hide_timing "$KERNEL_REPO/KernelSU-Next"
 
 	msg "Applying KernelSU-Next compatibility fixes"
 
