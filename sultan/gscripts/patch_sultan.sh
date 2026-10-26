@@ -120,7 +120,12 @@ clone_nomount() {
 	}
 
 clone_susfs() {
-	msg "Cloning SUSFS"
+	msg "Setting up SUSFS"
+
+	if [[ -d "${KERNEL_REPO}/susfs4ksu" && -f "${KERNEL_REPO}/susfs4ksu/kernel_patches/50_add_susfs_in_gki-android14-6.1.patch" ]]; then
+		msg "Using pre-bundled SUSFS from repository"
+		return 0
+	fi
 
 	if git_clone_retry \
 		--depth=1 \
