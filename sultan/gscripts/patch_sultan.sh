@@ -54,18 +54,20 @@ esac
 git_clone_retry() {
 	local max_attempts=5
 	local attempt=1
-	local delay=5
+	local delay=3
 
 	while (( attempt <= max_attempts )); do
 		if git clone "$@"; then
 			return 0
 		fi
-		warn "git clone $* failed (attempt ${attempt}/${max_attempts}). Retrying in ${delay}s..."
-		sleep "${delay}"
+		local jitter=$(( (RANDOM % 5) + 1 ))
+		local total_sleep=$(( delay + jitter ))
+		warn "git clone $* failed (attempt ${attempt}/${max_attempts}). Retrying in ${total_sleep}s..."
+		sleep "${total_sleep}"
 		(( attempt++ ))
-		(( delay += 5 ))
+		(( delay += 3 ))
 	done
-	die "Failed git clone $* after ${max_attempts} attempts."
+	return 1
 }
 
 clone_anykernel() {
@@ -75,7 +77,7 @@ clone_anykernel() {
 		--depth=1 \
 		-b "${ANYKERNEL_BRANCH_PREFIX}-${TARGET}" \
 		"${ANYKERNEL_REPO}" \
-		AnyKernel
+		AnyKernel || die "Failed to clone AnyKernel"
 }
 
 clone_sultan_patches() {
@@ -84,7 +86,7 @@ clone_sultan_patches() {
         git_clone_retry \
                 --depth=1 \
                 "${PATCHES2_REPO}" \
-                sultan_patches
+                sultan_patches || die "Failed to clone sultan patches"
 }
 
 clone_kernel_patches() {
@@ -93,7 +95,7 @@ clone_kernel_patches() {
 	git_clone_retry \
 		--depth=1 \
 		"${PATCHES_REPO}" \
-		kernel_patches
+		kernel_patches || die "Failed to clone kernel patches"
 }
 
 clone_nomount() {
@@ -120,10 +122,24 @@ clone_nomount() {
 clone_susfs() {
 	msg "Cloning SUSFS"
 
-	git_clone_retry \
+	if git_clone_retry \
 		--depth=1 \
 		-b "${SUSFS_BRANCH}" \
-		"${SUSFS_REPO}"
+		"${SUSFS_REPO}"; then
+		return 0
+	fi
+
+	warn "git clone failed for SUSFS. Falling back to GitLab CDN tarball archive..."
+	rm -rf susfs4ksu
+	mkdir -p susfs4ksu
+	if curl --fail --location --retry 5 --retry-delay 3 -s \
+		"https://gitlab.com/simonpunk/susfs4ksu/-/archive/${SUSFS_BRANCH}/susfs4ksu-${SUSFS_BRANCH}.tar.gz" | \
+		tar -xz --strip-components=1 -C susfs4ksu; then
+		msg "Successfully downloaded and extracted SUSFS from CDN tarball."
+		return 0
+	fi
+
+	die "Failed to obtain SUSFS via both git clone and CDN tarball."
 }
 
 clone_vpnhide() {
@@ -132,7 +148,7 @@ clone_vpnhide() {
         git_clone_retry \
                 --depth=1 \
                 -b "${VPNHIDE_BRANCH}" \
-                "${VPNHIDE_REPO}"
+                "${VPNHIDE_REPO}" || die "Failed to clone VPNHide"
 }
 
 install_ksu() {

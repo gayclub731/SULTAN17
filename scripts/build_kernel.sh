@@ -30,6 +30,7 @@ Options:
   -a, --archive-temp    Archive existing ./temp to ./backup/kernel/ and prepare clean
   -c, --clean-temp      Clean existing ./temp without archiving
   -r, --resume          Resume build inside existing ./temp
+  -y, --yes             Skip confirmation prompt
       --check-upstream  Run upstream check before building
       --no-check-upstream Skip upstream check
   -l, --lang <en|ru>    Language (default: en)
@@ -58,6 +59,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         -r|--resume)
             TEMP_ACTION="resume"
+            shift
+            ;;
+        -y|--yes)
+            AUTO_YES="yes"
             shift
             ;;
         --check-upstream)
@@ -268,7 +273,7 @@ fi
 echo -e "${C_CYAN}────────────────────────────────────────────────────────────────${C_RESET}\n"
 
 # Prompt confirmation if running interactively
-if [[ -t 0 ]]; then
+if [[ -t 0 && "${AUTO_YES:-no}" != "yes" ]]; then
     if [[ "$LANG_MODE" == "ru" ]]; then
         read -rp "$(echo -e "${C_BOLD}${C_YELLOW}Запустить процесс сборки? [Y/n]: ${C_RESET}")" ans_build || true
     else
