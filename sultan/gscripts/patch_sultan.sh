@@ -51,10 +51,27 @@ esac
 # HELPERS
 ######################################################
 
+git_clone_retry() {
+	local max_attempts=5
+	local attempt=1
+	local delay=5
+
+	while (( attempt <= max_attempts )); do
+		if git clone "$@"; then
+			return 0
+		fi
+		warn "git clone $* failed (attempt ${attempt}/${max_attempts}). Retrying in ${delay}s..."
+		sleep "${delay}"
+		(( attempt++ ))
+		(( delay += 5 ))
+	done
+	die "Failed git clone $* after ${max_attempts} attempts."
+}
+
 clone_anykernel() {
 	msg "Cloning AnyKernel"
 
-	git clone \
+	git_clone_retry \
 		--depth=1 \
 		-b "${ANYKERNEL_BRANCH_PREFIX}-${TARGET}" \
 		"${ANYKERNEL_REPO}" \
@@ -64,7 +81,7 @@ clone_anykernel() {
 clone_sultan_patches() {
         msg "Cloning sultan patches"
 
-        git clone \
+        git_clone_retry \
                 --depth=1 \
                 "${PATCHES2_REPO}" \
                 sultan_patches
@@ -73,7 +90,7 @@ clone_sultan_patches() {
 clone_kernel_patches() {
 	msg "Cloning kernel patches"
 
-	git clone \
+	git_clone_retry \
 		--depth=1 \
 		"${PATCHES_REPO}" \
 		kernel_patches
@@ -103,7 +120,7 @@ clone_nomount() {
 clone_susfs() {
 	msg "Cloning SUSFS"
 
-	git clone \
+	git_clone_retry \
 		--depth=1 \
 		-b "${SUSFS_BRANCH}" \
 		"${SUSFS_REPO}"
@@ -112,7 +129,7 @@ clone_susfs() {
 clone_vpnhide() {
         msg "Cloning VPNHide"
 
-        git clone \
+        git_clone_retry \
                 --depth=1 \
                 -b "${VPNHIDE_BRANCH}" \
                 "${VPNHIDE_REPO}"
@@ -198,8 +215,11 @@ patch_selinux_hide_timing() {
 	fi
 
 	msg "Applying SELinux hide timing fix to eliminate Duck Detector side-channel detection"
-	python3 - <<EOF
-with open("${target_file}", "r", encoding="utf-8") as f:
+	python3 - "${target_file}" <<'EOF'
+import sys
+
+target_file = sys.argv[1]
+with open(target_file, "r", encoding="utf-8") as f:
     content = f.read()
 
 # 1. Neutralize Duck Detector timing probe in my_setprocattr
@@ -235,7 +255,7 @@ new_alloc = """    /* Copy the string to allow changes and ensure a NUL terminat
     if (scontext_len < sizeof(scontext2_onstack)) {
         scontext2 = scontext2_onstack;
         memcpy(scontext2, scontext, scontext_len);
-        scontext2[scontext_len] = '\\0';
+        scontext2[scontext_len] = 0;
     } else {
         scontext2 = kmemdup_nul(scontext, scontext_len, gfp_flags);
         if (!scontext2)
@@ -246,7 +266,7 @@ new_alloc = """    /* Copy the string to allow changes and ensure a NUL terminat
     if (scontext_len < sizeof(scontext3_onstack)) {
         scontext3 = scontext3_onstack;
         memcpy(scontext3, scontext, scontext_len);
-        scontext3[scontext_len] = '\\0';
+        scontext3[scontext_len] = 0;
     } else {
         scontext3 = kmemdup_nul(scontext, scontext_len, gfp_flags);
         if (!scontext3) {
@@ -279,7 +299,7 @@ if old_alloc in content:
 if old_free in content:
     content = content.replace(old_free, new_free, 1)
 
-with open("${target_file}", "w", encoding="utf-8") as f:
+with open(target_file, "w", encoding="utf-8") as f:
     f.write(content)
 EOF
 }
