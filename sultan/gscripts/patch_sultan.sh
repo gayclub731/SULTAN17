@@ -201,14 +201,14 @@ install_ksu_next() {
 patch_utf8() {
 	msg "Patching UTF8"
 
-	patch -p1 < "$KERNEL_REPO"/kernel_patches/common/unicode_bypass_fix_6.1+.patch || true
+	patch -p1 --batch < "$KERNEL_REPO"/kernel_patches/common/unicode_bypass_fix_6.1+.patch || true
 }
 
 apply_patch() {
 	local dir="$1"
 	local patchfile="$2"
 
-	patch -d "$dir" -p1 < "$patchfile"
+	patch -d "$dir" -p1 --batch < "$patchfile"
 }
 
 apply_patch_optional() {
@@ -325,6 +325,90 @@ with open(target_file, "w", encoding="utf-8") as f:
 EOF
 }
 
+patch_sucompat() {
+	local ksu_dir="$1"
+	local target_file="${ksu_dir}/kernel/feature/sucompat.c"
+
+	if [[ ! -f "$target_file" ]]; then
+		return 0
+	fi
+
+	msg "Applying sucompat fixes for KernelSU-Next"
+	python3 - "${target_file}" <<'EOF'
+import sys
+
+target_file = sys.argv[1]
+with open(target_file, "r", encoding="utf-8") as f:
+    content = f.read()
+
+# 1. Fix misleading indentation in su_compat_feature_get and su_compat_feature_set
+content = content.replace(
+    "static int su_compat_feature_get(u64 *value)\n{\n    if (static_key_enabled(&ksu_su_compat_enabled))\n        *value = 1;\n    else\n        *value = 0;\n\treturn 0;\n}",
+    "static int su_compat_feature_get(u64 *value)\n{\n\tif (static_key_enabled(&ksu_su_compat_enabled))\n\t\t*value = 1;\n\telse\n\t\t*value = 0;\n\treturn 0;\n}"
+)
+content = content.replace(
+    "static int su_compat_feature_set(u64 value)\n{\n\tbool enable = value != 0;\n    if (enable)\n        static_branch_enable(&ksu_su_compat_enabled);\n    else\n        static_branch_disable(&ksu_su_compat_enabled);\n\tpr_info(\"su_compat: set to %d\\n\", enable);\n\treturn 0;\n}",
+    "static int su_compat_feature_set(u64 value)\n{\n\tbool enable = value != 0;\n\tif (enable)\n\t\tstatic_branch_enable(&ksu_su_compat_enabled);\n\telse\n\t\tstatic_branch_disable(&ksu_su_compat_enabled);\n\tpr_info(\"su_compat: set to %d\\n\", enable);\n\treturn 0;\n}"
+)
+
+# 2. Fix missing KSUD check and declarations in ksu_handle_execveat_init
+broken_init = """    if (!is_init(get_current_cred()))
+        return -EINVAL;
+
+        pr_info("hook_manager: escape to root for init executing ksud: %d\\n", current->pid);
+        pending_sucompat = ksu_sulog_capture_sucompat(filename->name, argv_user, GFP_KERNEL);
+        ret = escape_to_root_for_init();
+        if (ret) {
+            pr_err("escape_to_root_for_init() failed: %d\\n", ret);
+             return ret;
+\t\t}
+        if (!argv_user_ptr || IS_ERR(argv_user_ptr)) {
+            pr_err("!argv_user_ptr || IS_ERR(argv_user_ptr)\\n");
+            return 0;
+        }
+        ksu_sulog_emit_pending(pending_sucompat, ret, GFP_KERNEL);
+        return 0;
+\t}"""
+
+fixed_init = """    if (!is_init(get_current_cred()))
+        return -EINVAL;
+
+    if (unlikely(!strcmp(filename->name, KSUD_PATH))) {
+        const char __user *argv_user_ptr = get_user_arg_ptr(*argv_user, 0);
+        struct ksu_sulog_pending_event *pending_sucompat = NULL;
+
+        pr_info("hook_manager: escape to root for init executing ksud: %d\\n", current->pid);
+        pending_sucompat = ksu_sulog_capture_sucompat(filename->name, argv_user, GFP_KERNEL);
+        ret = escape_to_root_for_init();
+        if (ret) {
+            pr_err("escape_to_root_for_init() failed: %d\\n", ret);
+            return ret;
+        }
+        if (!argv_user_ptr || IS_ERR(argv_user_ptr)) {
+            pr_err("!argv_user_ptr || IS_ERR(argv_user_ptr)\\n");
+            return 0;
+        }
+        ksu_sulog_emit_pending(pending_sucompat, ret, GFP_KERNEL);
+        return 0;
+    }"""
+
+if broken_init in content:
+    content = content.replace(broken_init, fixed_init, 1)
+
+# 3. Add sulog calls to faccessat and stat if not present (from ksu_toolkit.patch)
+faccessat_target = '    pr_info("ksu_handle_faccessat: su->sh!\\n");'
+if "ksu_compat_sulog('a');" not in content and faccessat_target in content:
+    content = content.replace(faccessat_target, "    ksu_compat_sulog('a');\n" + faccessat_target, 1)
+
+stat_target = '    pr_info("ksu_handle_stat: su->sh!\\n");'
+if "ksu_compat_sulog('s');" not in content and stat_target in content:
+    content = content.replace(stat_target, "    ksu_compat_sulog('s');\n" + stat_target, 1)
+
+with open(target_file, "w", encoding="utf-8") as f:
+    f.write(content)
+EOF
+}
+
 patch_susfs_ksu() {
 	msg "Copying susfs libs"
 	copy_susfs
@@ -416,6 +500,8 @@ patch_susfs_ksu_next() {
         apply_patch_optional \
                 "$KERNEL_REPO/KernelSU-Next" \
                 "$KERNEL_REPO/kernel_patches/next/susfs_fix_patches/v2.2.0/overwrite_hook_mode.patch"
+
+        patch_sucompat "$KERNEL_REPO/KernelSU-Next"
 }
 
 patch_sultan() {
