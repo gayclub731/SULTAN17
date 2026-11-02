@@ -81,16 +81,26 @@ clone_anykernel() {
 }
 
 clone_sultan_patches() {
-        msg "Cloning sultan patches"
+	msg "Setting up sultan patches"
 
-        git_clone_retry \
-                --depth=1 \
-                "${PATCHES2_REPO}" \
-                sultan_patches || die "Failed to clone sultan patches"
+	if [[ -d "${KERNEL_REPO}/sultan_patches" && -f "${KERNEL_REPO}/sultan_patches/fixer.patch" ]]; then
+		msg "Using pre-bundled sultan patches from repository"
+		return 0
+	fi
+
+	git_clone_retry \
+		--depth=1 \
+		"${PATCHES2_REPO}" \
+		sultan_patches || die "Failed to clone sultan patches"
 }
 
 clone_kernel_patches() {
-	msg "Cloning kernel patches"
+	msg "Setting up kernel patches"
+
+	if [[ -d "${KERNEL_REPO}/kernel_patches/next/susfs_fix_patches/v2.3.0" && -d "${KERNEL_REPO}/kernel_patches/sultan" ]]; then
+		msg "Using pre-bundled kernel patches from repository"
+		return 0
+	fi
 
 	git_clone_retry \
 		--depth=1 \
@@ -335,10 +345,10 @@ patch_susfs_ksu() {
 
 	msg "Applying SUSFS KernelSU patch"
 	if ! patch --dry-run -s -f -d "$KERNEL_REPO/KernelSU" -p1 < "$KERNEL_REPO/susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" 2>/dev/null; then
-		warn "KernelSU HEAD has patch rejects with SUSFS. Falling back to verified compatible commit 3352209f..."
+		warn "KernelSU HEAD has patch rejects with SUSFS. Falling back to verified compatible commit 28db74f..."
 		(
 			cd "$KERNEL_REPO/KernelSU"
-			git checkout 3352209f44fc9c5f3ec6dff228080118433cb72c 2>/dev/null || true
+			git checkout 28db74f6f4692e97006ce9ebd8b19b9cc614b5b7 2>/dev/null || true
 		)
 	fi
 	apply_patch_optional \
@@ -358,6 +368,15 @@ patch_susfs_ksu_next() {
         "$KERNEL_REPO" \
         "$KERNEL_REPO/susfs4ksu/kernel_patches/50_add_susfs_in_gki-android14-6.1.patch"
 
+	if grep -q "ksu_selinux_inode_init" "$KERNEL_REPO/KernelSU-Next/kernel/core/init.c" 2>/dev/null; then
+		warn "KernelSU-Next dev contains incompatible non-module BTF changes. Falling back to verified compatible commit b427a3f9..."
+		(
+			cd "$KERNEL_REPO/KernelSU-Next"
+			git checkout -f b427a3f9c2421a443f961007bfce66b25486643f 2>/dev/null || true
+			git clean -fd 2>/dev/null || true
+		)
+	fi
+
 	msg "Applying SUSFS KernelSU patch"
 	if grep -q "mutex_lock(&selinux_state.status_lock);" "$KERNEL_REPO/KernelSU-Next/kernel/feature/selinux_hide.c" 2>/dev/null; then
 		sed -i '/mutex_lock(&selinux_state.status_lock);/d' "$KERNEL_REPO/KernelSU-Next/kernel/feature/selinux_hide.c"
@@ -373,49 +392,21 @@ patch_susfs_ksu_next() {
 
 	msg "Applying KernelSU-Next compatibility fixes"
 
-	apply_patch_optional \
-		"$KERNEL_REPO/KernelSU-Next" \
-		"$KERNEL_REPO/kernel_patches/next/susfs_fix_patches/v2.2.0/fix_Kbuild.patch"
+	local fix_patch_dir="$KERNEL_REPO/kernel_patches/next/susfs_fix_patches/v2.3.0"
+	if [[ ! -d "$fix_patch_dir" ]]; then
+		fix_patch_dir="$KERNEL_REPO/kernel_patches/next/susfs_fix_patches/v2.2.0"
+	fi
 
-	apply_patch_optional \
-		"$KERNEL_REPO/KernelSU-Next" \
-		"$KERNEL_REPO/kernel_patches/next/susfs_fix_patches/v2.2.0/fix_dispatch.c.patch"
-
-	apply_patch_optional \
-                "$KERNEL_REPO/KernelSU-Next" \
-                "$KERNEL_REPO/kernel_patches/next/susfs_fix_patches/v2.2.0/fix_init.c.patch"
-
-        apply_patch_optional \
-                "$KERNEL_REPO/KernelSU-Next" \
-        	"$KERNEL_REPO/kernel_patches/next/susfs_fix_patches/v2.2.0/fix_kernel_umount.c.patch"
-
-        apply_patch_optional \
-                "$KERNEL_REPO/KernelSU-Next" \
-                "$KERNEL_REPO/kernel_patches/next/susfs_fix_patches/v2.2.0/fix_setuid_hook.c.patch"
-
-        apply_patch_optional \
-                "$KERNEL_REPO/KernelSU-Next" \
-                "$KERNEL_REPO/kernel_patches/next/susfs_fix_patches/v2.2.0/fix_sucompat.c.patch"
-
-        apply_patch_optional \
-                "$KERNEL_REPO/KernelSU-Next" \
-                "$KERNEL_REPO/kernel_patches/next/susfs_fix_patches/v2.2.0/fix_supercall.c.patch"
-
-        apply_patch_optional \
-                "$KERNEL_REPO/KernelSU-Next" \
-                "$KERNEL_REPO/kernel_patches/next/susfs_fix_patches/v2.2.0/fix_selinux.c.patch"
-
-        apply_patch_optional \
-                "$KERNEL_REPO/KernelSU-Next" \
-                "$KERNEL_REPO/kernel_patches/next/susfs_fix_patches/v2.2.0/fix_ksu.h.patch"
-
-        apply_patch_optional \
-                "$KERNEL_REPO/KernelSU-Next" \
-                "$KERNEL_REPO/kernel_patches/next/susfs_fix_patches/v2.2.0/ksu_toolkit.patch"
-
-        apply_patch_optional \
-                "$KERNEL_REPO/KernelSU-Next" \
-                "$KERNEL_REPO/kernel_patches/next/susfs_fix_patches/v2.2.0/overwrite_hook_mode.patch"
+	apply_patch_optional "$KERNEL_REPO/KernelSU-Next" "$fix_patch_dir/fix_Kbuild.patch"
+	apply_patch_optional "$KERNEL_REPO/KernelSU-Next" "$fix_patch_dir/fix_dispatch.c.patch"
+	apply_patch_optional "$KERNEL_REPO/KernelSU-Next" "$fix_patch_dir/fix_init.c.patch"
+	apply_patch_optional "$KERNEL_REPO/KernelSU-Next" "$fix_patch_dir/fix_kernel_umount.c.patch"
+	apply_patch_optional "$KERNEL_REPO/KernelSU-Next" "$fix_patch_dir/fix_selinux_hide.c.patch"
+	apply_patch_optional "$KERNEL_REPO/KernelSU-Next" "$fix_patch_dir/fix_setuid_hook.c.patch"
+	apply_patch_optional "$KERNEL_REPO/KernelSU-Next" "$fix_patch_dir/fix_sucompat.c.patch"
+	apply_patch_optional "$KERNEL_REPO/KernelSU-Next" "$fix_patch_dir/fix_supercall.c.patch"
+	apply_patch_optional "$KERNEL_REPO/KernelSU-Next" "$fix_patch_dir/ksu_toolkit.patch"
+	apply_patch_optional "$KERNEL_REPO/KernelSU-Next" "$fix_patch_dir/overwrite_hook_mode.patch"
 }
 
 patch_sultan() {

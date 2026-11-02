@@ -1,0 +1,12 @@
+diff --git a/fs/namei.c b/fs/namei.c
+index 52363f0c0..b83817b78 100644
+--- a/fs/namei.c
++++ b/fs/namei.c
+@@ -40,6 +40,7 @@
+ #include <linux/bitops.h>
+ #include <linux/init_task.h>
+ #include <linux/uaccess.h>
++#include <linux/vpnhide.h>
+ #if defined(CONFIG_KSU_SUSFS_SUS_PATH) || defined(CONFIG_KSU_SUSFS_OPEN_REDIRECT)
+ #include <linux/susfs_def.h>
+ #endif

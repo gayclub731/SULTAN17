@@ -1,0 +1,24 @@
+diff --git a/fs/super.c b/fs/super.c
+index f4130d5..07c3c9a 100755
+--- a/fs/super.c
++++ b/fs/super.c
+@@ -37,11 +37,19 @@
+ #include <linux/lockdep.h>
+ #include <linux/user_namespace.h>
+ #include <linux/fs_context.h>
++#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++#include <linux/susfs_def.h>
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+ #include <uapi/linux/mount.h>
+ #include "internal.h"
+ 
+ #include <trace/hooks/fs.h>
+ 
++#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++extern bool susfs_is_current_ksu_domain(void);
++extern struct static_key_true susfs_is_sdcard_android_data_not_decrypted;
++#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
++
+ static int thaw_super_locked(struct super_block *sb);
+ 
+ static LIST_HEAD(super_blocks);

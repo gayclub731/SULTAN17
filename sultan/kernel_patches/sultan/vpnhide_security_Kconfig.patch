@@ -1,0 +1,13 @@
+diff --git a/security/Kconfig b/security/Kconfig
+index 8cd544714ed2..e069854e2889 100644
+--- a/security/Kconfig
++++ b/security/Kconfig
+@@ -242,6 +242,8 @@ source "security/landlock/Kconfig"
+ 
+ source "security/integrity/Kconfig"
+ 
++source "security/vpnhide/Kconfig"
++
+ choice
+ 	prompt "First legacy 'major LSM' to be initialized"
+ 	default DEFAULT_SECURITY_SELINUX if SECURITY_SELINUX
