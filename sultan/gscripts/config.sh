@@ -79,7 +79,7 @@ readonly SUSFS_BRANCH="gki-android14-6.1"
 readonly ANYKERNEL_REPO="https://github.com/Ante0/AnyKernel3"
 readonly ANYKERNEL_BRANCH_PREFIX="sultan-17"
 
-readonly PATCHES_REPO="https://github.com/WildKernels/kernel_patches"
+readonly PATCHES_REPO="https://github.com/Ante0/kernel_patches"
 readonly PATCHES2_REPO="https://github.com/Ante0/fix_patches"
 
 readonly NOMOUNT_REPO="https://github.com/maxsteeel/nomount"
