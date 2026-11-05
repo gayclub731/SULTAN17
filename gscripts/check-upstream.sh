@@ -246,7 +246,7 @@ else
     JSON='{"include":['
     FIRST=true
 
-    for BRANCH in 17.0.0-cp2a 17.0.0-cp3a; do
+    for BRANCH in 17.0.0-cp3a; do
     for TARGET in "${TARGETS[@]}"; do
         for VARIANT in "${BUILD_VARIANTS[@]}"; do
 
