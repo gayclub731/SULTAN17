@@ -1,0 +1,189 @@
+name: Build Kernel (Manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Target Pixel Device"
+        type: choice
+        required: true
+        default: "all"
+        options:
+          - all
+          - gs201
+          - zuma
+          - zumapro
+      variant:
+        description: "Kernel Variant (NoMount is included in all)"
+        type: choice
+        required: true
+        default: "all"
+        options:
+          - all
+          - ksu-susfs
+          - ksu-susfs-vpnhide
+          - ksu-next-susfs
+          - ksu-next-susfs-vpnhide
+
+permissions:
+  contents: write
+
+jobs:
+  prepare-matrix:
+    name: Generate Matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+    steps:
+      - name: Generate build matrix
+        id: gen
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          TARGET="${{ github.event.inputs.target }}"
+          VARIANT="${{ github.event.inputs.variant }}"
+
+          if [[ "$TARGET" == "all" ]]; then
+            TARGETS=(gs201 zuma zumapro)
+          else
+            TARGETS=("$TARGET")
+          fi
+
+          if [[ "$VARIANT" == "all" ]]; then
+            VARIANTS=(ksu-susfs ksu-susfs-vpnhide ksu-next-susfs ksu-next-susfs-vpnhide)
+          else
+            VARIANTS=("$VARIANT")
+          fi
+
+          JSON='{"include":['
+          FIRST=true
+          for T in "${TARGETS[@]}"; do
+            for V in "${VARIANTS[@]}"; do
+              if $FIRST; then FIRST=false; else JSON+=","; fi
+              JSON+="{\"target\":\"${T}\",\"variant\":\"${V}\"}"
+            done
+          done
+          JSON+="]}"
+          echo "matrix=$JSON" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: "${{ matrix.target }} • ${{ matrix.variant }}"
+    needs: prepare-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            bc \
+            bison \
+            build-essential \
+            ccache \
+            curl \
+            flex \
+            git \
+            gh \
+            jq \
+            libelf-dev \
+            libssl-dev \
+            lz4 \
+            pahole \
+            python3 \
+            rsync \
+            unzip \
+            zip
+
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-${{ runner.os }}-${{ matrix.target }}
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ matrix.target }}
+            ccache-${{ runner.os }}
+
+      - name: Ensure execution permissions
+        run: chmod +x menu.sh scripts/*.sh sultan/gscripts/*.sh
+
+      - name: Build Kernel
+        run: |
+          ./scripts/build_kernel.sh \
+            --target "${{ matrix.target }}" \
+            --variant "${{ matrix.variant }}" \
+            --clean-temp \
+            --no-check-upstream
+
+      - name: Upload Kernel Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SULTAN17_${{ matrix.target }}_${{ matrix.variant }}
+          path: |
+            release/*.zip
+            release/nightly.json
+          if-no-files-found: error
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: success() || failure()
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: downloaded_artifacts
+          merge-multiple: true
+
+      - name: Create or update GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -Eeuo pipefail
+          shopt -s nullglob
+          FILES=(downloaded_artifacts/*.zip)
+
+          if (( ${#FILES[@]} == 0 )); then
+            echo "No zip files found in artifacts. Skipping release creation."
+            exit 1
+          fi
+
+          # Ensure nightly.json contains only global metadata (no target or variant)
+          if [[ -f downloaded_artifacts/nightly.json ]]; then
+            jq 'del(.target, .variant)' downloaded_artifacts/nightly.json > downloaded_artifacts/nightly_clean.json
+            mv downloaded_artifacts/nightly_clean.json downloaded_artifacts/nightly.json
+          fi
+
+          BUILD_DATE="$(TZ='Asia/Novosibirsk' date +'%d.%m.%Y')"
+          TAG="17.0.0-cp3a_${BUILD_DATE}"
+          TITLE="Sultan 17.0.0-cp3a_${BUILD_DATE}"
+          NOTES=$(cat <<'EOF'
+          ### Automated Build of Sultan 17.0.0-cp3a
+
+          Supported devices:
+          - **gs201**: Pixel 7, 7 Pro, 7a
+          - **zuma**: Pixel 8, 8 Pro, 8a
+          - **zumapro**: Pixel 9, 9 Pro, 9 Pro XL, 9 Pro Fold
+
+          Built with KernelSU, KernelSU-Next, SusFS, NoMount, and VPNHide.
+          EOF
+          )
+
+          # Upload release assets using gh
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${FILES[@]}" downloaded_artifacts/nightly.json --clobber
+          else
+            gh release create "$TAG" "${FILES[@]}" downloaded_artifacts/nightly.json \
+              --title "$TITLE" \
+              --notes "$NOTES"
+          fi
+          echo "Release successfully published: $TAG"

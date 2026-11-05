@@ -270,6 +270,11 @@ fi
 ###############################################################################
 
 {
+    if ((${#BUILD_VARIANTS[@]} > 0)); then
+        echo "has_changes=true"
+    else
+        echo "has_changes=false"
+    fi
     echo "matrix=$JSON"
     echo "source_sha=$NEW_SOURCE"
     echo "ksu_sha=$NEW_KSU"

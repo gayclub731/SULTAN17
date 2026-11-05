@@ -163,14 +163,14 @@ install_ksu_next() {
 patch_utf8() {
 	msg "Patching UTF8"
 
-	patch -p1 < "$KERNEL_REPO"/kernel_patches/common/unicode_bypass_fix_6.1+.patch || true
+	patch --batch -p1 < "$KERNEL_REPO"/kernel_patches/common/unicode_bypass_fix_6.1+.patch || true
 }
 
 apply_patch() {
 	local dir="$1"
 	local patchfile="$2"
 
-	patch -d "$dir" -p1 < "$patchfile"
+	patch --batch -d "$dir" -p1 < "$patchfile"
 }
 
 apply_patch_optional() {
