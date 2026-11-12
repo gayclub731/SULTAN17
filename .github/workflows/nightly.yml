@@ -2,7 +2,7 @@ name: Automated Nightly Build
 
 on:
   schedule:
-    - cron: "20 5,17 * * *" # Runs twice daily: 00:20 and 12:20 in UTC+7 (05:20 and 17:20 UTC)
+    - cron: "12 13 * * *" # Runs once daily: 20:12 in UTC+7 (13:12 UTC)
   workflow_dispatch:
 
 permissions:
@@ -24,7 +24,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install dependencies
         run: |
@@ -77,7 +77,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install build dependencies
         run: |
@@ -102,7 +102,7 @@ jobs:
             zip
 
       - name: Restore ccache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.ccache
           key: ccache-nightly-${{ runner.os }}-${{ matrix.target }}
@@ -122,25 +122,46 @@ jobs:
             --no-check-upstream
 
       - name: Upload Kernel Artifact
-        uses: actions/upload-artifact@v4
+        id: upload_artifact
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
         with:
           name: Nightly_${{ matrix.target }}_${{ matrix.variant }}
           path: |
             release/*.zip
             release/nightly.json
           if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+      - name: Wait before artifact retry
+        if: steps.upload_artifact.outcome == 'failure'
+        run: sleep 30
+
+      - name: Retry Upload Kernel Artifact
+        if: steps.upload_artifact.outcome == 'failure'
+        uses: actions/upload-artifact@v7
+        with:
+          name: Nightly_${{ matrix.target }}_${{ matrix.variant }}
+          path: |
+            release/*.zip
+            release/nightly.json
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+          overwrite: true
 
   publish-release:
     name: Publish GitHub Release
     needs: [check-upstream, build-nightly]
     runs-on: ubuntu-latest
-    if: needs.check-upstream.outputs.has_changes == 'true'
+    if: always() && needs.check-upstream.outputs.has_changes == 'true' && (needs.build-nightly.result == 'success' || needs.build-nightly.result == 'failure')
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: downloaded_artifacts
           merge-multiple: true

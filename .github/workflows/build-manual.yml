@@ -76,7 +76,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install build dependencies
         run: |
@@ -101,7 +101,7 @@ jobs:
             zip
 
       - name: Restore ccache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.ccache
           key: ccache-${{ runner.os }}-${{ matrix.target }}
@@ -121,13 +121,34 @@ jobs:
             --no-check-upstream
 
       - name: Upload Kernel Artifact
-        uses: actions/upload-artifact@v4
+        id: upload_artifact
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
         with:
           name: SULTAN17_${{ matrix.target }}_${{ matrix.variant }}
           path: |
             release/*.zip
             release/nightly.json
           if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+      - name: Wait before artifact retry
+        if: steps.upload_artifact.outcome == 'failure'
+        run: sleep 30
+
+      - name: Retry Upload Kernel Artifact
+        if: steps.upload_artifact.outcome == 'failure'
+        uses: actions/upload-artifact@v7
+        with:
+          name: SULTAN17_${{ matrix.target }}_${{ matrix.variant }}
+          path: |
+            release/*.zip
+            release/nightly.json
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+          overwrite: true
 
   publish-release:
     name: Publish GitHub Release
@@ -136,10 +157,10 @@ jobs:
     if: success() || failure()
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: downloaded_artifacts
           merge-multiple: true

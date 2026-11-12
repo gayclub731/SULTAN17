@@ -51,51 +51,32 @@ esac
 # HELPERS
 ######################################################
 
-git_clone_retry() {
-	local max_attempts=5
-	local attempt=1
-	local delay=3
-
-	while (( attempt <= max_attempts )); do
-		if git clone "$@"; then
-			return 0
-		fi
-		local jitter=$(( (RANDOM % 5) + 1 ))
-		local total_sleep=$(( delay + jitter ))
-		warn "git clone $* failed (attempt ${attempt}/${max_attempts}). Retrying in ${total_sleep}s..."
-		sleep "${total_sleep}"
-		(( attempt++ ))
-		(( delay += 3 ))
-	done
-	return 1
-}
-
 clone_anykernel() {
 	msg "Cloning AnyKernel"
 
-	git_clone_retry \
+	git clone \
 		--depth=1 \
 		-b "${ANYKERNEL_BRANCH_PREFIX}-${TARGET}" \
 		"${ANYKERNEL_REPO}" \
-		AnyKernel || die "Failed to clone AnyKernel"
+		AnyKernel
 }
 
 clone_sultan_patches() {
         msg "Cloning sultan patches"
 
-        git_clone_retry \
+        git clone \
                 --depth=1 \
                 "${PATCHES2_REPO}" \
-                sultan_patches || die "Failed to clone sultan patches"
+                sultan_patches
 }
 
 clone_kernel_patches() {
 	msg "Cloning kernel patches"
 
-	git_clone_retry \
+	git clone \
 		--depth=1 \
 		"${PATCHES_REPO}" \
-		kernel_patches || die "Failed to clone kernel patches"
+		kernel_patches
 }
 
 clone_nomount() {
@@ -120,40 +101,21 @@ clone_nomount() {
 	}
 
 clone_susfs() {
-	msg "Setting up SUSFS"
+	msg "Cloning SUSFS"
 
-	if [[ -d "${KERNEL_REPO}/susfs4ksu" && -f "${KERNEL_REPO}/susfs4ksu/kernel_patches/50_add_susfs_in_gki-android14-6.1.patch" ]]; then
-		msg "Using pre-bundled SUSFS from repository"
-		return 0
-	fi
-
-	if git_clone_retry \
+	git clone \
 		--depth=1 \
 		-b "${SUSFS_BRANCH}" \
-		"${SUSFS_REPO}"; then
-		return 0
-	fi
-
-	warn "git clone failed for SUSFS. Falling back to GitLab CDN tarball archive..."
-	rm -rf susfs4ksu
-	mkdir -p susfs4ksu
-	if curl --fail --location --retry 5 --retry-delay 3 -s \
-		"https://gitlab.com/simonpunk/susfs4ksu/-/archive/${SUSFS_BRANCH}/susfs4ksu-${SUSFS_BRANCH}.tar.gz" | \
-		tar -xz --strip-components=1 -C susfs4ksu; then
-		msg "Successfully downloaded and extracted SUSFS from CDN tarball."
-		return 0
-	fi
-
-	die "Failed to obtain SUSFS via both git clone and CDN tarball."
+		"${SUSFS_REPO}"
 }
 
 clone_vpnhide() {
         msg "Cloning VPNHide"
 
-        git_clone_retry \
+        git clone \
                 --depth=1 \
                 -b "${VPNHIDE_BRANCH}" \
-                "${VPNHIDE_REPO}" || die "Failed to clone VPNHide"
+                "${VPNHIDE_REPO}"
 }
 
 install_ksu() {
@@ -201,14 +163,14 @@ install_ksu_next() {
 patch_utf8() {
 	msg "Patching UTF8"
 
-	patch -p1 --batch < "$KERNEL_REPO"/kernel_patches/common/unicode_bypass_fix_6.1+.patch || true
+	patch --batch -p1 < "$KERNEL_REPO"/kernel_patches/common/unicode_bypass_fix_6.1+.patch || true
 }
 
 apply_patch() {
 	local dir="$1"
 	local patchfile="$2"
 
-	patch -d "$dir" -p1 --batch < "$patchfile"
+	patch --batch -d "$dir" -p1 < "$patchfile"
 }
 
 apply_patch_optional() {
@@ -227,188 +189,6 @@ copy_susfs() {
 }
 ##
 
-patch_selinux_hide_timing() {
-	local ksu_dir="$1"
-	local target_file="${ksu_dir}/kernel/feature/selinux_hide.c"
-
-	if [[ ! -f "$target_file" ]]; then
-		return 0
-	fi
-
-	msg "Applying SELinux hide timing fix to eliminate Duck Detector side-channel detection"
-	python3 - "${target_file}" <<'EOF'
-import sys
-
-target_file = sys.argv[1]
-with open(target_file, "r", encoding="utf-8") as f:
-    content = f.read()
-
-# 1. Neutralize Duck Detector timing probe in my_setprocattr
-target_hook = "error = ksu_avc_has_perm_compat(mysid, mysid, SECCLASS_PROCESS, PROCESS__SETCURRENT, NULL);\n    if (error)\n        return error;"
-replacement_hook = """error = ksu_avc_has_perm_compat(mysid, mysid, SECCLASS_PROCESS, PROCESS__SETCURRENT, NULL);
-    if (error)
-        return error;
-
-    /* Fast-reject Duck Detector and side-channel timing probes */
-    if (unlikely(str && (strstr(str, "__selinux_hide_") || strstr(str, "duckdetector"))))
-        return -EINVAL;"""
-
-if target_hook in content and "__selinux_hide_" not in content:
-    content = content.replace(target_hook, replacement_hook, 1)
-
-# 2. Optimize context allocation in security_context_to_sid_with_policy to eliminate timing gap
-old_alloc = """    /* Copy the string to allow changes and ensure a NUL terminator */
-    scontext2 = kmemdup_nul(scontext, scontext_len, gfp_flags);
-    if (!scontext2)
-        return -ENOMEM;
-
-    scontext3 = kmemdup_nul(scontext, scontext_len, gfp_flags);
-    if (!scontext3) {
-        kfree(scontext2);
-        return -ENOMEM;
-    }"""
-
-new_alloc = """    /* Copy the string to allow changes and ensure a NUL terminator (on-stack fast path) */
-    char scontext2_onstack[128] __aligned(sizeof(long));
-    char scontext3_onstack[128] __aligned(sizeof(long));
-    bool scontext2_alloc = false, scontext3_alloc = false;
-
-    if (scontext_len < sizeof(scontext2_onstack)) {
-        scontext2 = scontext2_onstack;
-        memcpy(scontext2, scontext, scontext_len);
-        scontext2[scontext_len] = 0;
-    } else {
-        scontext2 = kmemdup_nul(scontext, scontext_len, gfp_flags);
-        if (!scontext2)
-            return -ENOMEM;
-        scontext2_alloc = true;
-    }
-
-    if (scontext_len < sizeof(scontext3_onstack)) {
-        scontext3 = scontext3_onstack;
-        memcpy(scontext3, scontext, scontext_len);
-        scontext3[scontext_len] = 0;
-    } else {
-        scontext3 = kmemdup_nul(scontext, scontext_len, gfp_flags);
-        if (!scontext3) {
-            if (scontext2_alloc)
-                kfree(scontext2);
-            return -ENOMEM;
-        }
-        scontext3_alloc = true;
-    }"""
-
-old_free = """    if (orig_rc_p)
-        *orig_rc_p = orig_rc;
-    kfree(scontext3);
-    kfree(scontext2);
-    kfree(str);
-    return rc;"""
-
-new_free = """    if (orig_rc_p)
-        *orig_rc_p = orig_rc;
-    if (scontext3_alloc)
-        kfree(scontext3);
-    if (scontext2_alloc)
-        kfree(scontext2);
-    kfree(str);
-    return rc;"""
-
-if old_alloc in content:
-    content = content.replace(old_alloc, new_alloc, 1)
-
-if old_free in content:
-    content = content.replace(old_free, new_free, 1)
-
-with open(target_file, "w", encoding="utf-8") as f:
-    f.write(content)
-EOF
-}
-
-patch_sucompat() {
-	local ksu_dir="$1"
-	local target_file="${ksu_dir}/kernel/feature/sucompat.c"
-
-	if [[ ! -f "$target_file" ]]; then
-		return 0
-	fi
-
-	msg "Applying sucompat fixes for KernelSU-Next"
-	python3 - "${target_file}" <<'EOF'
-import sys
-
-target_file = sys.argv[1]
-with open(target_file, "r", encoding="utf-8") as f:
-    content = f.read()
-
-# 1. Fix misleading indentation in su_compat_feature_get and su_compat_feature_set
-content = content.replace(
-    "static int su_compat_feature_get(u64 *value)\n{\n    if (static_key_enabled(&ksu_su_compat_enabled))\n        *value = 1;\n    else\n        *value = 0;\n\treturn 0;\n}",
-    "static int su_compat_feature_get(u64 *value)\n{\n\tif (static_key_enabled(&ksu_su_compat_enabled))\n\t\t*value = 1;\n\telse\n\t\t*value = 0;\n\treturn 0;\n}"
-)
-content = content.replace(
-    "static int su_compat_feature_set(u64 value)\n{\n\tbool enable = value != 0;\n    if (enable)\n        static_branch_enable(&ksu_su_compat_enabled);\n    else\n        static_branch_disable(&ksu_su_compat_enabled);\n\tpr_info(\"su_compat: set to %d\\n\", enable);\n\treturn 0;\n}",
-    "static int su_compat_feature_set(u64 value)\n{\n\tbool enable = value != 0;\n\tif (enable)\n\t\tstatic_branch_enable(&ksu_su_compat_enabled);\n\telse\n\t\tstatic_branch_disable(&ksu_su_compat_enabled);\n\tpr_info(\"su_compat: set to %d\\n\", enable);\n\treturn 0;\n}"
-)
-
-# 2. Fix missing KSUD check and declarations in ksu_handle_execveat_init
-broken_init = """    if (!is_init(get_current_cred()))
-        return -EINVAL;
-
-        pr_info("hook_manager: escape to root for init executing ksud: %d\\n", current->pid);
-        pending_sucompat = ksu_sulog_capture_sucompat(filename->name, argv_user, GFP_KERNEL);
-        ret = escape_to_root_for_init();
-        if (ret) {
-            pr_err("escape_to_root_for_init() failed: %d\\n", ret);
-             return ret;
-\t\t}
-        if (!argv_user_ptr || IS_ERR(argv_user_ptr)) {
-            pr_err("!argv_user_ptr || IS_ERR(argv_user_ptr)\\n");
-            return 0;
-        }
-        ksu_sulog_emit_pending(pending_sucompat, ret, GFP_KERNEL);
-        return 0;
-\t}"""
-
-fixed_init = """    if (!is_init(get_current_cred()))
-        return -EINVAL;
-
-    if (unlikely(!strcmp(filename->name, KSUD_PATH))) {
-        const char __user *argv_user_ptr = get_user_arg_ptr(*argv_user, 0);
-        struct ksu_sulog_pending_event *pending_sucompat = NULL;
-
-        pr_info("hook_manager: escape to root for init executing ksud: %d\\n", current->pid);
-        pending_sucompat = ksu_sulog_capture_sucompat(filename->name, argv_user, GFP_KERNEL);
-        ret = escape_to_root_for_init();
-        if (ret) {
-            pr_err("escape_to_root_for_init() failed: %d\\n", ret);
-            return ret;
-        }
-        if (!argv_user_ptr || IS_ERR(argv_user_ptr)) {
-            pr_err("!argv_user_ptr || IS_ERR(argv_user_ptr)\\n");
-            return 0;
-        }
-        ksu_sulog_emit_pending(pending_sucompat, ret, GFP_KERNEL);
-        return 0;
-    }"""
-
-if broken_init in content:
-    content = content.replace(broken_init, fixed_init, 1)
-
-# 3. Add sulog calls to faccessat and stat if not present (from ksu_toolkit.patch)
-faccessat_target = '    pr_info("ksu_handle_faccessat: su->sh!\\n");'
-if "ksu_compat_sulog('a');" not in content and faccessat_target in content:
-    content = content.replace(faccessat_target, "    ksu_compat_sulog('a');\n" + faccessat_target, 1)
-
-stat_target = '    pr_info("ksu_handle_stat: su->sh!\\n");'
-if "ksu_compat_sulog('s');" not in content and stat_target in content:
-    content = content.replace(stat_target, "    ksu_compat_sulog('s');\n" + stat_target, 1)
-
-with open(target_file, "w", encoding="utf-8") as f:
-    f.write(content)
-EOF
-}
-
 patch_susfs_ksu() {
 	msg "Copying susfs libs"
 	copy_susfs
@@ -418,18 +198,9 @@ patch_susfs_ksu() {
 		"$KERNEL_REPO/susfs4ksu/kernel_patches/50_add_susfs_in_gki-android14-6.1.patch"
 
 	msg "Applying SUSFS KernelSU patch"
-	if ! patch --dry-run -s -f -d "$KERNEL_REPO/KernelSU" -p1 < "$KERNEL_REPO/susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" 2>/dev/null; then
-		warn "KernelSU HEAD has patch rejects with SUSFS. Falling back to verified compatible commit 28db74f..."
-		(
-			cd "$KERNEL_REPO/KernelSU"
-			git checkout 28db74f6f4692e97006ce9ebd8b19b9cc614b5b7 2>/dev/null || true
-		)
-	fi
 	apply_patch_optional \
 		"$KERNEL_REPO/KernelSU" \
 		"$KERNEL_REPO/susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
-
-	patch_selinux_hide_timing "$KERNEL_REPO/KernelSU"
 }
 
 patch_susfs_ksu_next() {
@@ -443,17 +214,9 @@ patch_susfs_ksu_next() {
         "$KERNEL_REPO/susfs4ksu/kernel_patches/50_add_susfs_in_gki-android14-6.1.patch"
 
 	msg "Applying SUSFS KernelSU patch"
-	if grep -q "mutex_lock(&selinux_state.status_lock);" "$KERNEL_REPO/KernelSU-Next/kernel/feature/selinux_hide.c" 2>/dev/null; then
-		sed -i '/mutex_lock(&selinux_state.status_lock);/d' "$KERNEL_REPO/KernelSU-Next/kernel/feature/selinux_hide.c"
-		sed -i '/mutex_unlock(&selinux_state.status_lock);/d' "$KERNEL_REPO/KernelSU-Next/kernel/feature/selinux_hide.c"
-		sed -i 's/^[[:space:]]*data = fake_status;/        void *data = fake_status;/' "$KERNEL_REPO/KernelSU-Next/kernel/feature/selinux_hide.c"
-		sed -i '/^[[:space:]]*void \*data;$/d' "$KERNEL_REPO/KernelSU-Next/kernel/feature/selinux_hide.c"
-	fi
 	apply_patch_optional \
 		"$KERNEL_REPO/KernelSU-Next" \
 		"$KERNEL_REPO/susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
-
-	patch_selinux_hide_timing "$KERNEL_REPO/KernelSU-Next"
 
 	msg "Applying KernelSU-Next compatibility fixes"
 
@@ -491,6 +254,10 @@ patch_susfs_ksu_next() {
 
         apply_patch_optional \
                 "$KERNEL_REPO/KernelSU-Next" \
+                "$KERNEL_REPO/kernel_patches/next/susfs_fix_patches/v2.2.0/fix_rules.c.patch"
+
+        apply_patch_optional \
+                "$KERNEL_REPO/KernelSU-Next" \
                 "$KERNEL_REPO/kernel_patches/next/susfs_fix_patches/v2.2.0/fix_ksu.h.patch"
 
         apply_patch_optional \
@@ -500,8 +267,6 @@ patch_susfs_ksu_next() {
         apply_patch_optional \
                 "$KERNEL_REPO/KernelSU-Next" \
                 "$KERNEL_REPO/kernel_patches/next/susfs_fix_patches/v2.2.0/overwrite_hook_mode.patch"
-
-        patch_sucompat "$KERNEL_REPO/KernelSU-Next"
 }
 
 patch_sultan() {
@@ -521,9 +286,9 @@ patch_vpnhide() {
         cp -r "$KERNEL_REPO"/vpnhide/builtin/security/vpnhide "$KERNEL_REPO"/security/
 		mkdir "$KERNEL_REPO"/security/vpnhide/shared/
 		mkdir "$KERNEL_REPO"/security/vpnhide/generated/
-		cp "$KERNEL_REPO"/vpnhide/kmod/shared/vpnhide_logic.h "$KERNEL_REPO"/security/vpnhide/shared/
-		cp "$KERNEL_REPO"/vpnhide/kmod/generated/iface_lists.h "$KERNEL_REPO"/security/vpnhide/generated/
-		cp "$KERNEL_REPO"/vpnhide/kmod/generated/hook_ids.h "$KERNEL_REPO"/security/vpnhide/generated/
+	cp "$KERNEL_REPO"/vpnhide/kmod/shared/* "$KERNEL_REPO"/security/vpnhide/shared/
+	cp "$KERNEL_REPO"/vpnhide/kmod/generated/* "$KERNEL_REPO"/security/vpnhide/generated/
+	
         apply_patch_optional \
                 "$KERNEL_REPO" \
                 "$KERNEL_REPO"/vpnhide/builtin/versions/android14-6.1/fs_namei.c.patch
